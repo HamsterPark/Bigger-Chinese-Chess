@@ -134,7 +134,8 @@ h1 {
 }
 
 /* 棋盘样式 */
-#board {
+#board,
+#editorBoard {
   display: grid;
   position: relative;
   border: 2px solid #333;
@@ -177,8 +178,11 @@ h1 {
   border-right: 1px solid #333;
 }
 /* 宫区提示 */
-.cell.palace {
-  background-color: rgba(255, 255, 255, 0.25);
+.cell.palace-red {
+  background-color: rgba(255, 120, 120, 0.25);
+}
+.cell.palace-black {
+  background-color: rgba(120, 120, 120, 0.2);
 }
 /* 高亮可走位置 */
 .cell.highlight {
@@ -193,9 +197,9 @@ h1 {
   position: absolute;
   left: 0;
   right: 0;
-  height: 0;
+  height: 4px;
   pointer-events: none;
-  border-top: 4px solid rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.45);
 }
 .piece {
   font-size: 32px;
@@ -206,6 +210,11 @@ h1 {
 }
 .piece.black {
   color: #000;
+}
+.piece.block {
+  width: 100%;
+  height: 100%;
+  background: #111;
 }
 .dialog {
   position: fixed;
@@ -232,4 +241,148 @@ h1 {
   padding: 6px 12px;
   font-size: 16px;
   cursor: pointer;
+}
+
+/* 编辑器样式 */
+.editor-settings {
+  width: min(1100px, 96%);
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: #fff;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.editor-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 14px;
+}
+.editor-field label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.editor-field input {
+  width: 80px;
+  padding: 4px 6px;
+  font-size: 14px;
+}
+.palace-settings {
+  justify-content: space-between;
+  gap: 16px;
+}
+.palace-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #bbb;
+}
+.palace-group.palace-black {
+  background: rgba(80, 80, 80, 0.12);
+}
+.palace-group.palace-red {
+  background: rgba(255, 120, 120, 0.18);
+}
+.palace-title {
+  font-weight: 600;
+  margin-right: 6px;
+}
+.editor-area {
+  width: min(1200px, 96%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 16px;
+  margin: 16px 0 20px;
+}
+.editor-palette {
+  width: 150px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #fff;
+  box-sizing: border-box;
+}
+.palette-title {
+  text-align: center;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.palette-items {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.palette-piece {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #666;
+  border-radius: 8px;
+  background: #fff;
+  cursor: grab;
+  font-size: 24px;
+  user-select: none;
+}
+.palette-piece.red {
+  color: #d30000;
+}
+.palette-piece.black {
+  color: #000;
+}
+.palette-piece.block {
+  background: #111;
+  border-color: #111;
+}
+.editor-board-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  overflow: auto;
+}
+.delete-zone {
+  width: 100%;
+  padding: 10px 12px;
+  text-align: center;
+  border: 2px dashed #c0392b;
+  color: #c0392b;
+  border-radius: 10px;
+  background: #fff7f7;
+  box-sizing: border-box;
+}
+.delete-zone.drag-over {
+  background: #ffdcdc;
+}
+.load-dialog {
+  min-width: 240px;
+}
+.load-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.load-dialog select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 14px;
+}
+.load-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }

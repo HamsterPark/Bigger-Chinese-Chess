@@ -66,8 +66,8 @@
     <div class="menu-group">
       <div class="menu-title">自定义棋盘编辑器</div>
       <div class="menu-options">
-        <button class="option-button" type="button">编辑棋盘</button>
-        <button class="option-button" type="button">加载棋盘</button>
+        <button id="editBoardBtn" class="option-button" type="button">编辑棋盘</button>
+        <button id="loadBoardBtn" class="option-button" type="button">加载棋盘</button>
       </div>
     </div>
     <div class="menu-group">
@@ -107,6 +107,88 @@
     </div>
     <div id="status" class="status"></div>
     <div id="board"></div>
+  </div>
+
+  <div id="editorScreen" class="screen hidden">
+    <div class="controls game-header">
+      <button id="editorBackBtn">返回菜单</button>
+      <button id="editorApplyBtn">应用设置</button>
+      <button id="editorSaveBtn">保存棋盘</button>
+    </div>
+    <div class="editor-settings">
+      <label class="editor-field">棋盘名称
+        <input id="editorName" type="text" placeholder="例如：自定义棋盘" />
+      </label>
+      <div class="editor-field">
+        <label>列数
+          <input id="editorWidth" type="number" min="3" value="9" />
+        </label>
+        <label>行数
+          <input id="editorHeight" type="number" min="3" value="10" />
+        </label>
+        <label>楚河汉界在第
+          <input id="editorRiver" type="number" min="1" value="5" />
+          行下方
+        </label>
+      </div>
+      <div class="editor-field palace-settings">
+        <div class="palace-group palace-black">
+          <div class="palace-title">黑宫</div>
+          <label>左
+            <input id="editorBlackLeft" type="number" min="1" value="4" />
+          </label>
+          <label>上
+            <input id="editorBlackTop" type="number" min="1" value="1" />
+          </label>
+          <label>宽
+            <input id="editorBlackWidth" type="number" min="1" value="3" />
+          </label>
+          <label>高
+            <input id="editorBlackHeight" type="number" min="1" value="3" />
+          </label>
+        </div>
+        <div class="palace-group palace-red">
+          <div class="palace-title">红宫</div>
+          <label>左
+            <input id="editorRedLeft" type="number" min="1" value="4" />
+          </label>
+          <label>上
+            <input id="editorRedTop" type="number" min="1" value="8" />
+          </label>
+          <label>宽
+            <input id="editorRedWidth" type="number" min="1" value="3" />
+          </label>
+          <label>高
+            <input id="editorRedHeight" type="number" min="1" value="3" />
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="editor-area">
+      <div class="editor-palette">
+        <div class="palette-title">红方棋子</div>
+        <div id="paletteRedItems" class="palette-items"></div>
+      </div>
+      <div class="editor-board-area">
+        <div id="editorBoard"></div>
+        <div id="editorDeleteZone" class="delete-zone">拖到这里删除</div>
+      </div>
+      <div class="editor-palette">
+        <div class="palette-title">黑方棋子</div>
+        <div id="paletteBlackItems" class="palette-items"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="loadOverlay" class="dialog hidden" role="dialog" aria-modal="true">
+    <div class="dialog-content load-dialog">
+      <div class="load-title">加载棋盘</div>
+      <select id="loadBoardSelect"></select>
+      <div class="load-actions">
+        <button id="loadStartBtn">开始对局</button>
+        <button id="loadCancelBtn">取消</button>
+      </div>
+    </div>
   </div>
 
   <div id="resultOverlay" class="dialog hidden" role="dialog" aria-modal="true">

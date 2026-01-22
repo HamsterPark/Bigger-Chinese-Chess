@@ -2,35 +2,37 @@
  * 象棋扩展版小游戏逻辑
  *
  * 棋盘采用网格布局，支持自定义扩展尺寸，初始布局与宫界、河界随尺寸调整。
- * 棋子和规则与标准象棋一致，包含：车、马、象、士、将（帅）、炮、兵（卒）。
+ * 棋子和规则与标准象棋一致，包含：车、马、相、士、将（帅）、炮、兵（卒）。
  */
 
-// 基础棋盘大小
 const BASE_WIDTH = 9;
 const BASE_HEIGHT = 10;
 const CELL_SIZE = 60;
 const BASE_PAWN_COUNT = 5;
 const BASE_PALACE_WIDTH = 3;
 const BASE_PALACE_HEIGHT = 3;
-// 当前棋盘尺寸
+const STORAGE_KEY = 'betterXiangqiBoards';
+
 let boardWidth = BASE_WIDTH;
 let boardHeight = BASE_HEIGHT;
-// 棋盘数组，存放棋子或 null
 let board = [];
-// 当前执子方：'red' 或 'black'
 let currentPlayer = 'red';
-// 已选中的棋子对象，包含 x、y、piece
 let selected = null;
-// 当前可走位置列表
 let possibleMoves = [];
-// 扩展模式
 let pieceMode = 'standard';
-// AI 对手等级
 let aiLevel = 'none';
-// 游戏是否结束
 let gameOver = false;
-// 盘面几何信息（宫界、河界等）
 let boardMeta = null;
+let activeCustomBoard = null;
+
+let editorBoard = [];
+let editorMeta = null;
+let editorWidth = BASE_WIDTH;
+let editorHeight = BASE_HEIGHT;
+let editorRiverLine = Math.floor(BASE_HEIGHT / 2) - 1;
+let editorPalaceBlack = { left: 3, top: 0, width: 3, height: 3 };
+let editorPalaceRed = { left: 3, top: 7, width: 3, height: 3 };
+let editorInitialized = false;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -40,6 +42,69 @@ function parseSize(value, min) {
   const parsed = parseInt(value, 10);
   if (Number.isNaN(parsed)) return min;
   return Math.max(min, parsed);
+}
+
+function parseIntOr(value, fallback) {
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function createEmptyBoard(width, height) {
+  const nextBoard = [];
+  for (let y = 0; y < height; y++) {
+    const row = [];
+    for (let x = 0; x < width; x++) {
+      row.push(null);
+    }
+    nextBoard.push(row);
+  }
+  return nextBoard;
+}
+
+function normalizePalace(palace, width, height) {
+  const left = clamp(parseIntOr(palace.left, 0), 0, Math.max(0, width - 1));
+  const top = clamp(parseIntOr(palace.top, 0), 0, Math.max(0, height - 1));
+  const maxWidth = Math.max(1, width - left);
+  const maxHeight = Math.max(1, height - top);
+  const palaceWidth = clamp(parseIntOr(palace.width, 1), 1, maxWidth);
+  const palaceHeight = clamp(parseIntOr(palace.height, 1), 1, maxHeight);
+  return {
+    left,
+    top,
+    width: palaceWidth,
+    height: palaceHeight,
+    right: left + palaceWidth - 1,
+    bottom: top + palaceHeight - 1
+  };
+}
+
+function buildBoardMeta(width, height, riverRow, blackPalace, redPalace, scaleX, scaleY) {
+  const safeRiverRow = clamp(parseIntOr(riverRow, Math.floor(height / 2) - 1), 0, Math.max(0, height - 2));
+  const safeBlackPalace = normalizePalace(blackPalace, width, height);
+  const safeRedPalace = normalizePalace(redPalace, width, height);
+  return {
+    scaleX: scaleX || ((x) => x),
+    scaleY: scaleY || ((y) => y),
+    riverRow: safeRiverRow,
+    riverSplit: safeRiverRow + 1,
+    palace: {
+      black: safeBlackPalace,
+      red: safeRedPalace
+    }
+  };
+}
+
+function palaceAt(meta, x, y) {
+  const black = meta.palace.black;
+  const red = meta.palace.red;
+  if (x >= black.left && x <= black.right && y >= black.top && y <= black.bottom) return 'black';
+  if (x >= red.left && x <= red.right && y >= red.top && y <= red.bottom) return 'red';
+  return null;
+}
+
+function isInPalaceForMeta(meta, color, x, y) {
+  const palace = color === 'black' ? meta.palace.black : meta.palace.red;
+  return x >= palace.left && x <= palace.right && y >= palace.top && y <= palace.bottom;
 }
 
 function modeHasPawns() {
@@ -88,11 +153,22 @@ function includeRequiredColumns(columns, requiredColumns) {
   return Array.from(new Set(result)).sort((a, b) => a - b);
 }
 
+function getPalaceColumns(palace, count) {
+  let left = palace.left + 1;
+  let right = palace.right - 1;
+  if (right < left) {
+    left = palace.left;
+    right = palace.right;
+  }
+  const width = Math.max(1, right - left + 1);
+  const safeCount = Math.min(count, width);
+  return spreadPositions(safeCount, width).map(pos => pos + left);
+}
+
 function calcGeometry() {
   const scaleX = (x) => Math.round(x * (boardWidth - 1) / (BASE_WIDTH - 1));
   const scaleY = (y) => Math.round(y * (boardHeight - 1) / (BASE_HEIGHT - 1));
   const riverRow = Math.floor(boardHeight / 2) - 1;
-  const riverSplit = riverRow + 1;
   const palaceWidth = clamp(
     Math.ceil(boardWidth * BASE_PALACE_WIDTH / BASE_WIDTH),
     BASE_PALACE_WIDTH,
@@ -104,42 +180,20 @@ function calcGeometry() {
     Math.floor(boardHeight / 2)
   );
   const palaceLeft = Math.floor((boardWidth - palaceWidth) / 2);
-  const palaceRight = palaceLeft + palaceWidth - 1;
-  return {
-    scaleX,
-    scaleY,
-    riverRow,
-    riverSplit,
-    palace: {
-      left: palaceLeft,
-      right: palaceRight,
-      width: palaceWidth,
-      height: palaceHeight,
-      black: { top: 0, bottom: palaceHeight - 1 },
-      red: { top: boardHeight - palaceHeight, bottom: boardHeight - 1 }
-    }
-  };
+  const blackPalace = { left: palaceLeft, top: 0, width: palaceWidth, height: palaceHeight };
+  const redPalace = { left: palaceLeft, top: boardHeight - palaceHeight, width: palaceWidth, height: palaceHeight };
+  return buildBoardMeta(boardWidth, boardHeight, riverRow, blackPalace, redPalace, scaleX, scaleY);
 }
 
 function isInPalace(color, x, y) {
-  const palace = boardMeta.palace;
-  const bounds = color === 'black' ? palace.black : palace.red;
-  return x >= palace.left && x <= palace.right && y >= bounds.top && y <= bounds.bottom;
-}
-
-function isPalaceCell(x, y) {
-  const palace = boardMeta.palace;
-  return x >= palace.left && x <= palace.right &&
-    ((y >= palace.black.top && y <= palace.black.bottom) ||
-     (y >= palace.red.top && y <= palace.red.bottom));
+  return isInPalaceForMeta(boardMeta, color, x, y);
 }
 
 function placePiece(x, y, type, color) {
   if (x < 0 || x >= boardWidth || y < 0 || y >= boardHeight) return;
   if (board[y][x]) return;
-  board[y][x] = { type, color };
+  board[y][x] = { type, color: color ?? null };
 }
-
 function getGeneralColumns() {
   const columns = new Set();
   for (let y = 0; y < boardHeight; y++) {
@@ -187,15 +241,29 @@ function updateStatus(winner) {
 function showMenu() {
   const menuScreen = document.getElementById('menuScreen');
   const gameScreen = document.getElementById('gameScreen');
+  const editorScreen = document.getElementById('editorScreen');
   if (menuScreen) menuScreen.classList.remove('hidden');
   if (gameScreen) gameScreen.classList.add('hidden');
+  if (editorScreen) editorScreen.classList.add('hidden');
+  closeLoadDialog();
 }
 
 function showGame() {
   const menuScreen = document.getElementById('menuScreen');
   const gameScreen = document.getElementById('gameScreen');
+  const editorScreen = document.getElementById('editorScreen');
   if (menuScreen) menuScreen.classList.add('hidden');
   if (gameScreen) gameScreen.classList.remove('hidden');
+  if (editorScreen) editorScreen.classList.add('hidden');
+}
+
+function showEditor() {
+  const menuScreen = document.getElementById('menuScreen');
+  const gameScreen = document.getElementById('gameScreen');
+  const editorScreen = document.getElementById('editorScreen');
+  if (menuScreen) menuScreen.classList.add('hidden');
+  if (gameScreen) gameScreen.classList.add('hidden');
+  if (editorScreen) editorScreen.classList.remove('hidden');
 }
 
 function showResultDialog(winner) {
@@ -212,8 +280,8 @@ function closeResultDialog() {
 }
 
 function getSelectedValue(name, fallback) {
-  const selected = document.querySelector(`input[name="${name}"]:checked`);
-  return selected ? selected.value : fallback;
+  const selectedValue = document.querySelector(`input[name="${name}"]:checked`);
+  return selectedValue ? selectedValue.value : fallback;
 }
 
 function resolveBoardSize(mode) {
@@ -240,6 +308,7 @@ function updateCustomSizeVisibility() {
 }
 
 function startGame() {
+  activeCustomBoard = null;
   const boardMode = getSelectedValue('boardMode', 'normal');
   const expandMode = getSelectedValue('expandMode', 'standard');
   aiLevel = getSelectedValue('aiLevel', 'none');
@@ -262,37 +331,34 @@ function startGame() {
   showGame();
 }
 
-/**
- * 初始化棋盘数据：生成空棋盘并放置初始棋子。
- */
+function startGameWithConfig(config) {
+  activeCustomBoard = config;
+  pieceMode = 'standard';
+  initBoard();
+  renderBoard();
+  closeResultDialog();
+  showGame();
+}
+
 function initBoard() {
-  boardMeta = calcGeometry();
-  // 创建空棋盘
-  board = [];
-  for (let y = 0; y < boardHeight; y++) {
-    const row = [];
-    for (let x = 0; x < boardWidth; x++) {
-      row.push(null);
-    }
-    board.push(row);
+  if (activeCustomBoard) {
+    initBoardFromConfig(activeCustomBoard);
+    return;
   }
+  boardMeta = calcGeometry();
+  board = createEmptyBoard(boardWidth, boardHeight);
   const { scaleX, scaleY } = boardMeta;
-  // 放置标准初始棋子（不含兵、将、士）
   const placements = [
-    // 黑方主力
     { x: 0, y: 0, type: 'r', color: 'black' },
     { x: 1, y: 0, type: 'h', color: 'black' },
     { x: 2, y: 0, type: 'e', color: 'black' },
     { x: 6, y: 0, type: 'e', color: 'black' },
     { x: 7, y: 0, type: 'h', color: 'black' },
     { x: 8, y: 0, type: 'r', color: 'black' },
-    // 黑方炮
     { x: 1, y: 2, type: 'c', color: 'black' },
     { x: 7, y: 2, type: 'c', color: 'black' },
-    // 红方炮
     { x: 1, y: 7, type: 'c', color: 'red' },
     { x: 7, y: 7, type: 'c', color: 'red' },
-    // 红方主力
     { x: 0, y: 9, type: 'r', color: 'red' },
     { x: 1, y: 9, type: 'h', color: 'red' },
     { x: 2, y: 9, type: 'e', color: 'red' },
@@ -315,29 +381,58 @@ function initBoard() {
   updateStatus();
 }
 
+function initBoardFromConfig(config) {
+  const width = parseSize(config.width, BASE_WIDTH);
+  const height = parseSize(config.height, BASE_HEIGHT);
+  const fallbackLeft = Math.floor((width - BASE_PALACE_WIDTH) / 2);
+  const riverRow = parseIntOr(config.riverRow, Math.floor(height / 2) - 1);
+  const blackPalace = config.palace && config.palace.black
+    ? config.palace.black
+    : { left: fallbackLeft, top: 0, width: BASE_PALACE_WIDTH, height: BASE_PALACE_HEIGHT };
+  const redPalace = config.palace && config.palace.red
+    ? config.palace.red
+    : { left: fallbackLeft, top: height - BASE_PALACE_HEIGHT, width: BASE_PALACE_WIDTH, height: BASE_PALACE_HEIGHT };
+  boardWidth = width;
+  boardHeight = height;
+  boardMeta = buildBoardMeta(width, height, riverRow, blackPalace, redPalace);
+  board = createEmptyBoard(width, height);
+  if (Array.isArray(config.pieces)) {
+    config.pieces.forEach(piece => {
+      if (!piece || typeof piece.x !== 'number' || typeof piece.y !== 'number' || !piece.type) return;
+      placePiece(piece.x, piece.y, piece.type, piece.color ?? null);
+    });
+  }
+  currentPlayer = 'red';
+  selected = null;
+  possibleMoves = [];
+  gameOver = false;
+  updateStatus();
+}
+
 function placeAdvisors() {
-  const palace = boardMeta.palace;
-  placePiece(palace.left, palace.black.top, 'a', 'black');
-  placePiece(palace.right, palace.black.top, 'a', 'black');
-  placePiece(palace.left, palace.red.bottom, 'a', 'red');
-  placePiece(palace.right, palace.red.bottom, 'a', 'red');
+  const blackPalace = boardMeta.palace.black;
+  const redPalace = boardMeta.palace.red;
+  placePiece(blackPalace.left, blackPalace.top, 'a', 'black');
+  placePiece(blackPalace.right, blackPalace.top, 'a', 'black');
+  placePiece(redPalace.left, redPalace.bottom, 'a', 'red');
+  placePiece(redPalace.right, redPalace.bottom, 'a', 'red');
 }
 
 function placeGenerals() {
-  const palace = boardMeta.palace;
-  const innerLeft = palace.left + 1;
-  const innerRight = palace.right - 1;
-  const innerWidth = Math.max(1, innerRight - innerLeft + 1);
+  const blackPalace = boardMeta.palace.black;
+  const redPalace = boardMeta.palace.red;
   let count = 1;
   if (modeHasGenerals()) {
-    count = Math.max(1, Math.round(palace.width / BASE_PALACE_WIDTH));
+    const baseWidth = Math.min(blackPalace.width, redPalace.width);
+    count = Math.max(1, Math.round(baseWidth / BASE_PALACE_WIDTH));
   }
-  count = Math.min(count, innerWidth);
-  const columns = spreadPositions(count, innerWidth).map(pos => pos + innerLeft);
-  columns.forEach(col => {
-    placePiece(col, palace.black.top, 'g', 'black');
-    placePiece(col, palace.red.bottom, 'g', 'red');
-  });
+  const blackColumns = getPalaceColumns(blackPalace, count);
+  const redColumns = getPalaceColumns(redPalace, count);
+  const finalCount = Math.min(blackColumns.length, redColumns.length);
+  for (let i = 0; i < finalCount; i++) {
+    placePiece(blackColumns[i], blackPalace.top, 'g', 'black');
+    placePiece(redColumns[i], redPalace.bottom, 'g', 'red');
+  }
 }
 
 function placePawns() {
@@ -356,35 +451,24 @@ function placePawns() {
     placePiece(col, redRow, 'p', 'red');
   });
 }
-
-/**
- * 根据棋子类别和当前局面，计算指定棋子可走的位置
- * @param {number} x 当前位置 x
- * @param {number} y 当前位置 y
- * @param {Object} piece 棋子对象
- * @returns {Array<{x:number,y:number}>} 合法目标位置数组
- */
 function calcMoves(x, y, piece) {
   const moves = [];
   const type = piece.type;
   const color = piece.color;
   const { riverRow, riverSplit } = boardMeta;
-  // 辅助函数：检查目标是否在界内且不是己方棋子
+
   function canMoveTo(tx, ty) {
     if (tx < 0 || tx >= boardWidth || ty < 0 || ty >= boardHeight) return false;
     const target = board[ty][tx];
-    return !target || target.color !== color;
+    if (!target) return true;
+    if (target.type === 'b') return false;
+    return target.color !== color;
   }
 
-  // 判断将帅不能对脸（飞将）
   function violatesFlyingGeneral(tx, ty, pieceObj) {
-    // 仅在落子后才检查
-    // 创建临时棋盘副本
     const temp = board.map(row => row.map(cell => cell ? { ...cell } : null));
-    // 在副本上移动棋子
     temp[y][x] = null;
     temp[ty][tx] = { type: pieceObj.type, color: pieceObj.color };
-    // 找到双方将的位置（支持多个将）
     const redGenerals = [];
     const blackGenerals = [];
     for (let ry = 0; ry < boardHeight; ry++) {
@@ -415,43 +499,45 @@ function calcMoves(x, y, piece) {
     return false;
   }
 
-  // 车（rook）
   if (type === 'r') {
-    // 横向和纵向
-    const directions = [ { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 } ];
+    const directions = [
+      { dx: 1, dy: 0 },
+      { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: 0, dy: -1 }
+    ];
     directions.forEach(dir => {
       let tx = x + dir.dx;
       let ty = y + dir.dy;
       while (tx >= 0 && tx < boardWidth && ty >= 0 && ty < boardHeight) {
         const target = board[ty][tx];
         if (!target) {
-          // 空格
           if (!violatesFlyingGeneral(tx, ty, piece)) moves.push({ x: tx, y: ty });
         } else {
-          // 有棋子
-          if (target.color !== color) {
+          if (target.type !== 'b' && target.color !== color) {
             if (!violatesFlyingGeneral(tx, ty, piece)) moves.push({ x: tx, y: ty });
           }
-          // 被阻挡
           break;
         }
         tx += dir.dx;
         ty += dir.dy;
       }
     });
-  }
-  // 马（horse）
-  else if (type === 'h') {
-    // 八个跳跃方向
-    const horseMoves = [ { dx: 2, dy: 1, blockX: 1, blockY: 0 }, { dx: 2, dy: -1, blockX: 1, blockY: 0 },
-                         { dx: -2, dy: 1, blockX: -1, blockY: 0 }, { dx: -2, dy: -1, blockX: -1, blockY: 0 },
-                         { dx: 1, dy: 2, blockX: 0, blockY: 1 }, { dx: -1, dy: 2, blockX: 0, blockY: 1 },
-                         { dx: 1, dy: -2, blockX: 0, blockY: -1 }, { dx: -1, dy: -2, blockX: 0, blockY: -1 } ];
+  } else if (type === 'h') {
+    const horseMoves = [
+      { dx: 2, dy: 1, blockX: 1, blockY: 0 },
+      { dx: 2, dy: -1, blockX: 1, blockY: 0 },
+      { dx: -2, dy: 1, blockX: -1, blockY: 0 },
+      { dx: -2, dy: -1, blockX: -1, blockY: 0 },
+      { dx: 1, dy: 2, blockX: 0, blockY: 1 },
+      { dx: -1, dy: 2, blockX: 0, blockY: 1 },
+      { dx: 1, dy: -2, blockX: 0, blockY: -1 },
+      { dx: -1, dy: -2, blockX: 0, blockY: -1 }
+    ];
     horseMoves.forEach(m => {
       const legX = x + m.blockX;
       const legY = y + m.blockY;
       if (legX < 0 || legX >= boardWidth || legY < 0 || legY >= boardHeight) return;
-      // 阻马脚
       if (board[legY][legX]) return;
       const tx = x + m.dx;
       const ty = y + m.dy;
@@ -459,61 +545,65 @@ function calcMoves(x, y, piece) {
         if (!violatesFlyingGeneral(tx, ty, piece)) moves.push({ x: tx, y: ty });
       }
     });
-  }
-  // 象（elephant）
-  else if (type === 'e') {
-    // 四个对角线
-    const eleMoves = [ { dx: 2, dy: 2 }, { dx: 2, dy: -2 }, { dx: -2, dy: 2 }, { dx: -2, dy: -2 } ];
+  } else if (type === 'e') {
+    const eleMoves = [
+      { dx: 2, dy: 2 },
+      { dx: 2, dy: -2 },
+      { dx: -2, dy: 2 },
+      { dx: -2, dy: -2 }
+    ];
     eleMoves.forEach(m => {
       const eyeX = x + m.dx / 2;
       const eyeY = y + m.dy / 2;
       const tx = x + m.dx;
       const ty = y + m.dy;
-      // 不出界
       if (tx < 0 || tx >= boardWidth || ty < 0 || ty >= boardHeight) return;
-      // 不能被堵象眼
       if (board[eyeY][eyeX]) return;
-      // 不能过河
       if (color === 'black' && ty > riverRow) return;
       if (color === 'red' && ty < riverSplit) return;
       if (canMoveTo(tx, ty)) {
         if (!violatesFlyingGeneral(tx, ty, piece)) moves.push({ x: tx, y: ty });
       }
     });
-  }
-  // 士（advisor）
-  else if (type === 'a') {
-    // 四个对角线一步
-    const advMoves = [ { dx: 1, dy: 1 }, { dx: 1, dy: -1 }, { dx: -1, dy: 1 }, { dx: -1, dy: -1 } ];
+  } else if (type === 'a') {
+    const advMoves = [
+      { dx: 1, dy: 1 },
+      { dx: 1, dy: -1 },
+      { dx: -1, dy: 1 },
+      { dx: -1, dy: -1 }
+    ];
     advMoves.forEach(m => {
       const tx = x + m.dx;
       const ty = y + m.dy;
-      // 目标在己方宫内
       if (isInPalace(color, tx, ty)) {
         if (canMoveTo(tx, ty)) {
           if (!violatesFlyingGeneral(tx, ty, piece)) moves.push({ x: tx, y: ty });
         }
       }
     });
-  }
-  // 将/帅（general/king）
-  else if (type === 'g') {
-    const dirs = [ { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 } ];
+  } else if (type === 'g') {
+    const dirs = [
+      { dx: 1, dy: 0 },
+      { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: 0, dy: -1 }
+    ];
     dirs.forEach(dir => {
       const tx = x + dir.dx;
       const ty = y + dir.dy;
-      // 目标需在己方宫内
       if (isInPalace(color, tx, ty)) {
         if (canMoveTo(tx, ty)) {
           if (!violatesFlyingGeneral(tx, ty, piece)) moves.push({ x: tx, y: ty });
         }
       }
     });
-  }
-  // 炮（cannon）
-  else if (type === 'c') {
-    // 像车一样的移动，但吃子必须隔一个
-    const directions = [ { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 } ];
+  } else if (type === 'c') {
+    const directions = [
+      { dx: 1, dy: 0 },
+      { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: 0, dy: -1 }
+    ];
     directions.forEach(dir => {
       let tx = x + dir.dx;
       let ty = y + dir.dy;
@@ -521,18 +611,14 @@ function calcMoves(x, y, piece) {
       while (tx >= 0 && tx < boardWidth && ty >= 0 && ty < boardHeight) {
         const target = board[ty][tx];
         if (!jumped) {
-          // 未跳过屏风
           if (!target) {
-            // 可以走
             if (!violatesFlyingGeneral(tx, ty, piece)) moves.push({ x: tx, y: ty });
           } else {
-            // 第一次遇到棋子，标记为已跳
             jumped = true;
           }
         } else {
-          // 已跳过屏风，只能吃第一个对方棋子
           if (target) {
-            if (target.color !== color) {
+            if (target.type !== 'b' && target.color !== color) {
               if (!violatesFlyingGeneral(tx, ty, piece)) moves.push({ x: tx, y: ty });
             }
             break;
@@ -542,20 +628,18 @@ function calcMoves(x, y, piece) {
         ty += dir.dy;
       }
     });
-  }
-  // 兵/卒（pawn）
-  else if (type === 'p') {
-    // 对于黑方，向下走；红方，向上走
+  } else if (type === 'p') {
     const dy = color === 'red' ? -1 : 1;
     const forwardX = x;
     const forwardY = y + dy;
-    // 前进一步
     if (canMoveTo(forwardX, forwardY)) {
       if (!violatesFlyingGeneral(forwardX, forwardY, piece)) moves.push({ x: forwardX, y: forwardY });
     }
-    // 过河后，可以左右移动
     if ((color === 'red' && y <= riverRow) || (color === 'black' && y >= riverSplit)) {
-      const sideMoves = [ { dx: -1, dy: 0 }, { dx: 1, dy: 0 } ];
+      const sideMoves = [
+        { dx: -1, dy: 0 },
+        { dx: 1, dy: 0 }
+      ];
       sideMoves.forEach(m => {
         const tx = x + m.dx;
         const ty = y;
@@ -564,31 +648,53 @@ function calcMoves(x, y, piece) {
         }
       });
     }
+  } else if (type === 'q') {
+    const directions = [
+      { dx: 1, dy: 0 },
+      { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: 0, dy: -1 },
+      { dx: 1, dy: 1 },
+      { dx: 1, dy: -1 },
+      { dx: -1, dy: 1 },
+      { dx: -1, dy: -1 }
+    ];
+    directions.forEach(dir => {
+      let tx = x + dir.dx;
+      let ty = y + dir.dy;
+      while (tx >= 0 && tx < boardWidth && ty >= 0 && ty < boardHeight) {
+        const target = board[ty][tx];
+        if (!target) {
+          if (!violatesFlyingGeneral(tx, ty, piece)) moves.push({ x: tx, y: ty });
+        } else {
+          if (target.type !== 'b' && target.color !== color) {
+            if (!violatesFlyingGeneral(tx, ty, piece)) moves.push({ x: tx, y: ty });
+          }
+          break;
+        }
+        tx += dir.dx;
+        ty += dir.dy;
+      }
+    });
   }
+
   return moves;
 }
-
-/**
- * 根据棋子类型和颜色返回显示字符
- * @param {Object} piece 棋子对象
- * @returns {string}
- */
 function getPieceChar(piece) {
   if (!piece) return '';
   const { type, color } = piece;
-  // 使用常见的象棋字形
-  const redChars = { g: '帅', a: '仕', e: '相', h: '傌', r: '俥', c: '炮', p: '兵' };
-  const blackChars = { g: '将', a: '士', e: '象', h: '馬', r: '車', c: '砲', p: '卒' };
-  return color === 'red' ? redChars[type] : blackChars[type];
+  if (type === 'b') return '';
+  const redChars = { g: '帅', a: '仕', e: '相', h: '马', r: '车', c: '炮', p: '兵', q: '后' };
+  const blackChars = { g: '将', a: '士', e: '象', h: '马', r: '车', c: '炮', p: '卒', q: '后' };
+  if (color === 'red') return redChars[type] || '';
+  if (color === 'black') return blackChars[type] || '';
+  return '';
 }
 
-/**
- * 渲染棋盘到页面
- */
 function renderBoard() {
   const boardDiv = document.getElementById('board');
+  if (!boardDiv) return;
   boardDiv.innerHTML = '';
-  // 设置网格列数
   boardDiv.style.gridTemplateColumns = `repeat(${boardWidth}, ${CELL_SIZE}px)`;
   boardDiv.style.gridTemplateRows = `repeat(${boardHeight}, ${CELL_SIZE}px)`;
   boardDiv.style.width = `${boardWidth * CELL_SIZE}px`;
@@ -599,63 +705,61 @@ function renderBoard() {
       cellDiv.className = 'cell';
       cellDiv.dataset.x = x;
       cellDiv.dataset.y = y;
-      // 边界线加粗
       if (x === 0) cellDiv.classList.add('left-edge');
       if (y === 0) cellDiv.classList.add('top-edge');
       if (x === boardWidth - 1) cellDiv.classList.add('right-edge');
       if (y === boardHeight - 1) cellDiv.classList.add('bottom-edge');
-      // 如果是宫内格子，添加 palace 类
-      if (isPalaceCell(x, y)) {
-        cellDiv.classList.add('palace');
+      const palaceSide = palaceAt(boardMeta, x, y);
+      if (palaceSide === 'red') {
+        cellDiv.classList.add('palace-red');
+      } else if (palaceSide === 'black') {
+        cellDiv.classList.add('palace-black');
       }
-      // 是否在可移动列表内
       if (possibleMoves.some(m => m.x === x && m.y === y)) {
         cellDiv.classList.add('highlight');
       }
       const piece = board[y][x];
       if (piece) {
-        const span = document.createElement('span');
-        span.className = 'piece ' + piece.color;
-        span.textContent = getPieceChar(piece);
-        // 选中棋子样式
-        if (selected && selected.x === x && selected.y === y) {
-          span.classList.add('selected-piece');
+        let pieceEl;
+        if (piece.type === 'b') {
+          pieceEl = document.createElement('div');
+          pieceEl.className = 'piece block';
+        } else {
+          const span = document.createElement('span');
+          span.className = `piece ${piece.color}`;
+          span.textContent = getPieceChar(piece);
+          pieceEl = span;
         }
-        cellDiv.appendChild(span);
+        if (selected && selected.x === x && selected.y === y && piece.type !== 'b') {
+          pieceEl.classList.add('selected-piece');
+        }
+        cellDiv.appendChild(pieceEl);
       }
-      // 单元格点击事件
       cellDiv.addEventListener('click', () => onCellClick(x, y));
       boardDiv.appendChild(cellDiv);
     }
   }
-  renderRiverOverlay(boardDiv);
+  renderRiverOverlay(boardDiv, boardMeta);
 }
 
-function renderRiverOverlay(boardDiv) {
+function renderRiverOverlay(boardDiv, meta) {
+  if (!meta) return;
   const riverOverlay = document.createElement('div');
   riverOverlay.className = 'river-overlay';
-  const riverY = (boardMeta.riverRow + 1) * CELL_SIZE;
   const lineThickness = 4;
-  riverOverlay.style.borderTopWidth = `${lineThickness}px`;
+  riverOverlay.style.height = `${lineThickness}px`;
+  const riverY = (meta.riverRow + 1) * CELL_SIZE;
   riverOverlay.style.top = `${riverY - lineThickness / 2}px`;
   boardDiv.appendChild(riverOverlay);
 }
 
-/**
- * 处理点击棋盘单元格
- * @param {number} x
- * @param {number} y
- */
 function onCellClick(x, y) {
   if (gameOver) return;
   const clickedPiece = board[y][x];
   if (selected) {
-    // 如果点击的是合法移动位置
     if (possibleMoves.some(m => m.x === x && m.y === y)) {
-      // 执行移动
       board[y][x] = { ...selected.piece };
       board[selected.y][selected.x] = null;
-      // 清除选择
       selected = null;
       possibleMoves = [];
       const winner = checkWinner();
@@ -666,34 +770,335 @@ function onCellClick(x, y) {
         renderBoard();
         return;
       }
-      // 切换玩家
       currentPlayer = currentPlayer === 'red' ? 'black' : 'red';
       updateStatus();
       renderBoard();
       return;
     }
-    // 若再次点击己方棋子，则重新计算
-    if (clickedPiece && clickedPiece.color === currentPlayer) {
+    if (clickedPiece && clickedPiece.color === currentPlayer && clickedPiece.type !== 'b') {
       selected = { x, y, piece: clickedPiece };
       possibleMoves = calcMoves(x, y, clickedPiece);
       renderBoard();
       return;
     }
-    // 点击其他位置，取消选择
     selected = null;
     possibleMoves = [];
     renderBoard();
     return;
   }
-  // 尚未选中棋子时
-  if (clickedPiece && clickedPiece.color === currentPlayer) {
+  if (clickedPiece && clickedPiece.color === currentPlayer && clickedPiece.type !== 'b') {
     selected = { x, y, piece: clickedPiece };
     possibleMoves = calcMoves(x, y, clickedPiece);
     renderBoard();
   }
 }
+function getStoredBoards() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (error) {
+    return [];
+  }
+}
 
-// 绑定按钮事件
+function saveStoredBoards(boards) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(boards));
+}
+
+function collectEditorConfig(name) {
+  const pieces = [];
+  for (let y = 0; y < editorHeight; y++) {
+    for (let x = 0; x < editorWidth; x++) {
+      const piece = editorBoard[y][x];
+      if (!piece) continue;
+      pieces.push({
+        x,
+        y,
+        type: piece.type,
+        color: piece.color ?? null
+      });
+    }
+  }
+  const palaceBlack = editorMeta.palace.black;
+  const palaceRed = editorMeta.palace.red;
+  return {
+    name,
+    width: editorWidth,
+    height: editorHeight,
+    riverRow: editorMeta.riverRow,
+    palace: {
+      black: {
+        left: palaceBlack.left,
+        top: palaceBlack.top,
+        width: palaceBlack.width,
+        height: palaceBlack.height
+      },
+      red: {
+        left: palaceRed.left,
+        top: palaceRed.top,
+        width: palaceRed.width,
+        height: palaceRed.height
+      }
+    },
+    pieces
+  };
+}
+
+function syncEditorInputs() {
+  const widthInput = document.getElementById('editorWidth');
+  const heightInput = document.getElementById('editorHeight');
+  const riverInput = document.getElementById('editorRiver');
+  const blackLeftInput = document.getElementById('editorBlackLeft');
+  const blackTopInput = document.getElementById('editorBlackTop');
+  const blackWidthInput = document.getElementById('editorBlackWidth');
+  const blackHeightInput = document.getElementById('editorBlackHeight');
+  const redLeftInput = document.getElementById('editorRedLeft');
+  const redTopInput = document.getElementById('editorRedTop');
+  const redWidthInput = document.getElementById('editorRedWidth');
+  const redHeightInput = document.getElementById('editorRedHeight');
+
+  if (widthInput) widthInput.value = editorWidth;
+  if (heightInput) heightInput.value = editorHeight;
+  if (riverInput) riverInput.value = editorMeta.riverRow + 1;
+
+  if (blackLeftInput) blackLeftInput.value = editorMeta.palace.black.left + 1;
+  if (blackTopInput) blackTopInput.value = editorMeta.palace.black.top + 1;
+  if (blackWidthInput) blackWidthInput.value = editorMeta.palace.black.width;
+  if (blackHeightInput) blackHeightInput.value = editorMeta.palace.black.height;
+
+  if (redLeftInput) redLeftInput.value = editorMeta.palace.red.left + 1;
+  if (redTopInput) redTopInput.value = editorMeta.palace.red.top + 1;
+  if (redWidthInput) redWidthInput.value = editorMeta.palace.red.width;
+  if (redHeightInput) redHeightInput.value = editorMeta.palace.red.height;
+}
+
+function resizeEditorBoard(nextWidth, nextHeight) {
+  const nextBoard = createEmptyBoard(nextWidth, nextHeight);
+  const copyHeight = Math.min(nextHeight, editorBoard.length);
+  const copyWidth = editorBoard.length ? Math.min(nextWidth, editorBoard[0].length) : 0;
+  for (let y = 0; y < copyHeight; y++) {
+    for (let x = 0; x < copyWidth; x++) {
+      nextBoard[y][x] = editorBoard[y][x];
+    }
+  }
+  editorBoard = nextBoard;
+}
+
+function applyEditorSettings(preservePieces = true) {
+  const width = parseSize(parseIntOr(document.getElementById('editorWidth')?.value, BASE_WIDTH), 3);
+  const height = parseSize(parseIntOr(document.getElementById('editorHeight')?.value, BASE_HEIGHT), 3);
+  const riverLine = clamp(
+    parseIntOr(document.getElementById('editorRiver')?.value, Math.floor(height / 2)),
+    1,
+    Math.max(1, height - 1)
+  );
+  const blackPalaceInput = {
+    left: parseIntOr(document.getElementById('editorBlackLeft')?.value, 1) - 1,
+    top: parseIntOr(document.getElementById('editorBlackTop')?.value, 1) - 1,
+    width: parseIntOr(document.getElementById('editorBlackWidth')?.value, BASE_PALACE_WIDTH),
+    height: parseIntOr(document.getElementById('editorBlackHeight')?.value, BASE_PALACE_HEIGHT)
+  };
+  const redPalaceInput = {
+    left: parseIntOr(document.getElementById('editorRedLeft')?.value, 1) - 1,
+    top: parseIntOr(document.getElementById('editorRedTop')?.value, height - BASE_PALACE_HEIGHT + 1) - 1,
+    width: parseIntOr(document.getElementById('editorRedWidth')?.value, BASE_PALACE_WIDTH),
+    height: parseIntOr(document.getElementById('editorRedHeight')?.value, BASE_PALACE_HEIGHT)
+  };
+
+  editorWidth = width;
+  editorHeight = height;
+  editorRiverLine = riverLine - 1;
+  const blackPalace = normalizePalace(blackPalaceInput, width, height);
+  const redPalace = normalizePalace(redPalaceInput, width, height);
+  if (!preservePieces || !editorBoard.length) {
+    editorBoard = createEmptyBoard(width, height);
+  } else {
+    resizeEditorBoard(width, height);
+  }
+  editorMeta = buildBoardMeta(width, height, editorRiverLine, blackPalace, redPalace);
+  editorPalaceBlack = editorMeta.palace.black;
+  editorPalaceRed = editorMeta.palace.red;
+  syncEditorInputs();
+  renderEditorBoard();
+}
+
+function canPlacePieceInEditor(piece, x, y) {
+  if (!piece) return false;
+  if (x < 0 || x >= editorWidth || y < 0 || y >= editorHeight) return false;
+  if (piece.type === 'g' || piece.type === 'a') {
+    if (!piece.color) return false;
+    return isInPalaceForMeta(editorMeta, piece.color, x, y);
+  }
+  return true;
+}
+
+function parseDragData(data) {
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    return null;
+  }
+}
+
+function renderEditorPalettes() {
+  const paletteItems = [
+    { type: 'g', label: '将/帅' },
+    { type: 'a', label: '士/仕' },
+    { type: 'e', label: '象/相' },
+    { type: 'h', label: '马' },
+    { type: 'r', label: '车' },
+    { type: 'c', label: '炮' },
+    { type: 'p', label: '兵/卒' },
+    { type: 'q', label: '后' },
+    { type: 'b', label: '路障' }
+  ];
+
+  function renderPalette(containerId, color) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    paletteItems.forEach(item => {
+      const pieceEl = document.createElement('div');
+      pieceEl.className = 'palette-piece';
+      pieceEl.draggable = true;
+      pieceEl.title = item.label;
+      if (item.type === 'b') {
+        pieceEl.classList.add('block');
+      } else {
+        pieceEl.classList.add(color);
+        pieceEl.textContent = getPieceChar({ type: item.type, color });
+      }
+      pieceEl.addEventListener('dragstart', (event) => {
+        const payload = {
+          source: 'palette',
+          type: item.type,
+          color: item.type === 'b' ? null : color
+        };
+        event.dataTransfer.setData('text/plain', JSON.stringify(payload));
+        event.dataTransfer.effectAllowed = 'copy';
+      });
+      container.appendChild(pieceEl);
+    });
+  }
+
+  renderPalette('paletteRedItems', 'red');
+  renderPalette('paletteBlackItems', 'black');
+}
+function renderEditorBoard() {
+  const boardDiv = document.getElementById('editorBoard');
+  if (!boardDiv) return;
+  boardDiv.innerHTML = '';
+  boardDiv.style.gridTemplateColumns = `repeat(${editorWidth}, ${CELL_SIZE}px)`;
+  boardDiv.style.gridTemplateRows = `repeat(${editorHeight}, ${CELL_SIZE}px)`;
+  boardDiv.style.width = `${editorWidth * CELL_SIZE}px`;
+  boardDiv.style.height = `${editorHeight * CELL_SIZE}px`;
+  for (let y = 0; y < editorHeight; y++) {
+    for (let x = 0; x < editorWidth; x++) {
+      const cellDiv = document.createElement('div');
+      cellDiv.className = 'cell';
+      cellDiv.dataset.x = x;
+      cellDiv.dataset.y = y;
+      if (x === 0) cellDiv.classList.add('left-edge');
+      if (y === 0) cellDiv.classList.add('top-edge');
+      if (x === editorWidth - 1) cellDiv.classList.add('right-edge');
+      if (y === editorHeight - 1) cellDiv.classList.add('bottom-edge');
+      const palaceSide = palaceAt(editorMeta, x, y);
+      if (palaceSide === 'red') {
+        cellDiv.classList.add('palace-red');
+      } else if (palaceSide === 'black') {
+        cellDiv.classList.add('palace-black');
+      }
+      const piece = editorBoard[y][x];
+      if (piece) {
+        let pieceEl;
+        if (piece.type === 'b') {
+          pieceEl = document.createElement('div');
+          pieceEl.className = 'piece block';
+        } else {
+          const span = document.createElement('span');
+          span.className = `piece ${piece.color}`;
+          span.textContent = getPieceChar(piece);
+          pieceEl = span;
+        }
+        pieceEl.draggable = true;
+        pieceEl.addEventListener('dragstart', (event) => {
+          const payload = {
+            source: 'board',
+            type: piece.type,
+            color: piece.color ?? null,
+            x,
+            y
+          };
+          event.dataTransfer.setData('text/plain', JSON.stringify(payload));
+          event.dataTransfer.effectAllowed = 'move';
+        });
+        cellDiv.appendChild(pieceEl);
+      }
+      cellDiv.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+      });
+      cellDiv.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const payload = parseDragData(event.dataTransfer.getData('text/plain'));
+        if (!payload || !payload.type) return;
+        const piece = { type: payload.type, color: payload.color ?? null };
+        if (!canPlacePieceInEditor(piece, x, y)) return;
+        if (payload.source === 'board') {
+          if (payload.x === x && payload.y === y) return;
+          if (editorBoard[payload.y] && editorBoard[payload.y][payload.x]) {
+            editorBoard[payload.y][payload.x] = null;
+          }
+        }
+        editorBoard[y][x] = piece;
+        renderEditorBoard();
+      });
+      boardDiv.appendChild(cellDiv);
+    }
+  }
+  renderRiverOverlay(boardDiv, editorMeta);
+}
+
+function initEditor() {
+  editorWidth = BASE_WIDTH;
+  editorHeight = BASE_HEIGHT;
+  editorRiverLine = Math.floor(BASE_HEIGHT / 2) - 1;
+  editorPalaceBlack = { left: 3, top: 0, width: 3, height: 3 };
+  editorPalaceRed = { left: 3, top: BASE_HEIGHT - BASE_PALACE_HEIGHT, width: 3, height: 3 };
+  editorBoard = createEmptyBoard(editorWidth, editorHeight);
+  editorMeta = buildBoardMeta(editorWidth, editorHeight, editorRiverLine, editorPalaceBlack, editorPalaceRed);
+  editorPalaceBlack = editorMeta.palace.black;
+  editorPalaceRed = editorMeta.palace.red;
+  renderEditorPalettes();
+  syncEditorInputs();
+  renderEditorBoard();
+}
+
+function openLoadDialog() {
+  const boards = getStoredBoards();
+  if (!boards.length) {
+    alert('暂无保存的棋盘');
+    return;
+  }
+  const select = document.getElementById('loadBoardSelect');
+  if (!select) return;
+  select.innerHTML = '';
+  boards.forEach((boardItem, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = boardItem.name || `自定义棋盘${index + 1}`;
+    select.appendChild(option);
+  });
+  const overlay = document.getElementById('loadOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+}
+
+function closeLoadDialog() {
+  const overlay = document.getElementById('loadOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
 const startBtn = document.getElementById('startBtn');
 if (startBtn) startBtn.addEventListener('click', startGame);
 
@@ -712,6 +1117,83 @@ if (resetBtn) resetBtn.addEventListener('click', () => {
 
 const resultCloseBtn = document.getElementById('resultCloseBtn');
 if (resultCloseBtn) resultCloseBtn.addEventListener('click', closeResultDialog);
+
+const editBoardBtn = document.getElementById('editBoardBtn');
+if (editBoardBtn) editBoardBtn.addEventListener('click', () => {
+  if (!editorInitialized) {
+    editorInitialized = true;
+    initEditor();
+  } else {
+    renderEditorBoard();
+  }
+  showEditor();
+});
+
+const loadBoardBtn = document.getElementById('loadBoardBtn');
+if (loadBoardBtn) loadBoardBtn.addEventListener('click', openLoadDialog);
+
+const editorBackBtn = document.getElementById('editorBackBtn');
+if (editorBackBtn) editorBackBtn.addEventListener('click', showMenu);
+
+const editorApplyBtn = document.getElementById('editorApplyBtn');
+if (editorApplyBtn) editorApplyBtn.addEventListener('click', () => applyEditorSettings(true));
+
+const editorSaveBtn = document.getElementById('editorSaveBtn');
+if (editorSaveBtn) editorSaveBtn.addEventListener('click', () => {
+  const nameInput = document.getElementById('editorName');
+  const name = nameInput ? nameInput.value.trim() : '';
+  if (!name) {
+    alert('请填写棋盘名称');
+    return;
+  }
+  const config = collectEditorConfig(name);
+  const boards = getStoredBoards();
+  const existingIndex = boards.findIndex(boardItem => boardItem.name === name);
+  if (existingIndex >= 0) {
+    if (!confirm('同名棋盘已存在，是否覆盖？')) return;
+    boards[existingIndex] = config;
+  } else {
+    boards.push(config);
+  }
+  saveStoredBoards(boards);
+  alert('棋盘已保存');
+});
+
+const loadStartBtn = document.getElementById('loadStartBtn');
+if (loadStartBtn) loadStartBtn.addEventListener('click', () => {
+  const boards = getStoredBoards();
+  const select = document.getElementById('loadBoardSelect');
+  const index = parseInt(select ? select.value : '', 10);
+  const config = boards[index];
+  if (!config) return;
+  closeLoadDialog();
+  startGameWithConfig(config);
+});
+
+const loadCancelBtn = document.getElementById('loadCancelBtn');
+if (loadCancelBtn) loadCancelBtn.addEventListener('click', closeLoadDialog);
+
+const deleteZone = document.getElementById('editorDeleteZone');
+if (deleteZone) {
+  deleteZone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    deleteZone.classList.add('drag-over');
+    event.dataTransfer.dropEffect = 'move';
+  });
+  deleteZone.addEventListener('dragleave', () => {
+    deleteZone.classList.remove('drag-over');
+  });
+  deleteZone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    deleteZone.classList.remove('drag-over');
+    const payload = parseDragData(event.dataTransfer.getData('text/plain'));
+    if (!payload || payload.source !== 'board') return;
+    if (editorBoard[payload.y] && editorBoard[payload.y][payload.x]) {
+      editorBoard[payload.y][payload.x] = null;
+      renderEditorBoard();
+    }
+  });
+}
 
 document.querySelectorAll('input[name="boardMode"]').forEach((radio) => {
   radio.addEventListener('change', updateCustomSizeVisibility);
