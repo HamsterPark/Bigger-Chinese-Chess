@@ -33,6 +33,7 @@ let editorRiverLine = Math.floor(BASE_HEIGHT / 2) - 1;
 let editorPalaceBlack = { left: 3, top: 0, width: 3, height: 3 };
 let editorPalaceRed = { left: 3, top: 7, width: 3, height: 3 };
 let editorInitialized = false;
+let editorDragPayload = null;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -929,6 +930,11 @@ function canPlacePieceInEditor(piece, x, y) {
     if (!piece.color) return false;
     return isInPalaceForMeta(editorMeta, piece.color, x, y);
   }
+  if (piece.type === 'e') {
+    if (!piece.color) return false;
+    if (piece.color === 'black') return y <= editorMeta.riverRow;
+    return y >= editorMeta.riverSplit;
+  }
   return true;
 }
 
@@ -975,8 +981,12 @@ function renderEditorPalettes() {
           type: item.type,
           color: item.type === 'b' ? null : color
         };
+        editorDragPayload = payload;
         event.dataTransfer.setData('text/plain', JSON.stringify(payload));
         event.dataTransfer.effectAllowed = 'copy';
+      });
+      pieceEl.addEventListener('dragend', () => {
+        editorDragPayload = null;
       });
       container.appendChild(pieceEl);
     });
@@ -1030,8 +1040,12 @@ function renderEditorBoard() {
             x,
             y
           };
+          editorDragPayload = payload;
           event.dataTransfer.setData('text/plain', JSON.stringify(payload));
           event.dataTransfer.effectAllowed = 'move';
+        });
+        pieceEl.addEventListener('dragend', () => {
+          editorDragPayload = null;
         });
         cellDiv.appendChild(pieceEl);
       }
@@ -1042,7 +1056,8 @@ function renderEditorBoard() {
       });
       cellDiv.addEventListener('drop', (event) => {
         event.preventDefault();
-        const payload = parseDragData(event.dataTransfer.getData('text/plain'));
+        const payload = parseDragData(event.dataTransfer.getData('text/plain')) || editorDragPayload;
+        editorDragPayload = null;
         if (!payload || !payload.type) return;
         const piece = { type: payload.type, color: payload.color ?? null };
         if (!canPlacePieceInEditor(piece, x, y)) return;
@@ -1137,7 +1152,7 @@ const editorBackBtn = document.getElementById('editorBackBtn');
 if (editorBackBtn) editorBackBtn.addEventListener('click', showMenu);
 
 const editorApplyBtn = document.getElementById('editorApplyBtn');
-if (editorApplyBtn) editorApplyBtn.addEventListener('click', () => applyEditorSettings(true));
+if (editorApplyBtn) editorApplyBtn.addEventListener('click', () => applyEditorSettings(false));
 
 const editorSaveBtn = document.getElementById('editorSaveBtn');
 if (editorSaveBtn) editorSaveBtn.addEventListener('click', () => {
@@ -1187,7 +1202,8 @@ if (deleteZone) {
   deleteZone.addEventListener('drop', (event) => {
     event.preventDefault();
     deleteZone.classList.remove('drag-over');
-    const payload = parseDragData(event.dataTransfer.getData('text/plain'));
+    const payload = parseDragData(event.dataTransfer.getData('text/plain')) || editorDragPayload;
+    editorDragPayload = null;
     if (!payload || payload.source !== 'board') return;
     if (editorBoard[payload.y] && editorBoard[payload.y][payload.x]) {
       editorBoard[payload.y][payload.x] = null;
