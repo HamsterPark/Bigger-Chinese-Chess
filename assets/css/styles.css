@@ -241,6 +241,12 @@ h1 {
 .cell.highlight {
   background-color: rgba(0, 255, 0, 0.3);
 }
+.cell.last-move-from {
+  background-color: rgba(255, 215, 0, 0.18);
+}
+.cell.last-move-to {
+  background-color: rgba(255, 215, 0, 0.35);
+}
 /* 选中棋子 */
 .selected-piece {
   outline: 2px solid #f00;

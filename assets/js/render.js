@@ -42,6 +42,12 @@ function renderBoard() {
       if (possibleMoves.some(m => m.x === x && m.y === y)) {
         cellDiv.classList.add('highlight');
       }
+      if (lastMove && lastMove.fromX === x && lastMove.fromY === y) {
+        cellDiv.classList.add('last-move-from');
+      }
+      if (lastMove && lastMove.toX === x && lastMove.toY === y) {
+        cellDiv.classList.add('last-move-to');
+      }
       const piece = board[y][x];
       if (piece) {
         let pieceEl;
@@ -85,6 +91,12 @@ function onCellClick(x, y) {
     if (possibleMoves.some(m => m.x === x && m.y === y)) {
       board[y][x] = { ...selected.piece };
       board[selected.y][selected.x] = null;
+      lastMove = {
+        fromX: selected.x,
+        fromY: selected.y,
+        toX: x,
+        toY: y
+      };
       selected = null;
       possibleMoves = [];
       const winner = checkWinner();

@@ -19,6 +19,7 @@ let board = [];
 let currentPlayer = 'red';
 let selected = null;
 let possibleMoves = [];
+let lastMove = null;
 let pieceMode = 'standard';
 let aiLevel = 'none';
 let gameOver = false;

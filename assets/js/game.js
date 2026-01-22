@@ -35,6 +35,7 @@
   currentPlayer = 'red';
   selected = null;
   possibleMoves = [];
+  lastMove = null;
   gameOver = false;
   updateStatus();
   resetMoveHistory();
@@ -64,6 +65,7 @@ function initBoardFromConfig(config) {
   currentPlayer = 'red';
   selected = null;
   possibleMoves = [];
+  lastMove = null;
   gameOver = false;
   updateStatus();
   resetMoveHistory();
@@ -120,7 +122,8 @@ function buildHistorySnapshot() {
   return {
     board: cloneBoardSnapshot(board),
     currentPlayer,
-    gameOver
+    gameOver,
+    lastMove: lastMove ? { ...lastMove } : null
   };
 }
 
@@ -143,6 +146,7 @@ function undoLastTurn() {
   board = cloneBoardSnapshot(snapshot.board);
   currentPlayer = snapshot.currentPlayer;
   gameOver = snapshot.gameOver;
+  lastMove = snapshot.lastMove ? { ...snapshot.lastMove } : null;
   selected = null;
   possibleMoves = [];
   return true;

@@ -247,6 +247,12 @@ function applyMoveToBoard(move) {
   if (!movingPiece) return;
   board[move.toY][move.toX] = { ...movingPiece };
   board[move.fromY][move.fromX] = null;
+  lastMove = {
+    fromX: move.fromX,
+    fromY: move.fromY,
+    toX: move.toX,
+    toY: move.toY
+  };
 }
 
 function findBestMove(depth, timeLimit, token) {
