@@ -2,10 +2,10 @@
   return Math.max(min, Math.min(max, value));
 }
 
-function parseSize(value, min) {
+function parseSize(value, fallback) {
   const parsed = parseInt(value, 10);
-  if (Number.isNaN(parsed)) return min;
-  return Math.max(min, parsed);
+  if (Number.isNaN(parsed)) return typeof fallback === 'number' ? fallback : 1;
+  return Math.max(1, parsed);
 }
 
 function parseIntOr(value, fallback) {

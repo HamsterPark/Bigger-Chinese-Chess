@@ -1812,7 +1812,7 @@
                    ]
     },
     {
-        "name":  "鑲夋悘",
+        "name":  "肉搏",
         "width":  9,
         "height":  10,
         "riverRow":  4,
@@ -2014,7 +2014,7 @@
                    ]
     },
     {
-        "name":  "璧涜溅",
+        "name":  "赛车",
         "width":  20,
         "height":  20,
         "riverRow":  9,
@@ -2372,7 +2372,7 @@
                    ]
     },
     {
-        "name":  "杩涙敾",
+        "name":  "进攻",
         "width":  7,
         "height":  10,
         "riverRow":  2,
@@ -2568,7 +2568,7 @@
                    ]
     },
     {
-        "name":  "闃插畧",
+        "name":  "防守",
         "width":  7,
         "height":  10,
         "riverRow":  6,

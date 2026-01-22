@@ -28,6 +28,42 @@
   statusEl.textContent = `当前：${currentPlayer === 'red' ? '红方' : '黑方'}`;
 }
 
+let selectedPresetIndex = null;
+
+function getSelectedPresetConfig() {
+  if (typeof BUILTIN_BOARDS === 'undefined') return null;
+  if (selectedPresetIndex === null) return null;
+  return BUILTIN_BOARDS[selectedPresetIndex] || null;
+}
+
+function updatePresetButtons() {
+  const buttons = document.querySelectorAll('[data-board-index]');
+  buttons.forEach((button) => {
+    const index = parseInt(button.dataset.boardIndex, 10);
+    if (Number.isNaN(index)) return;
+    const config = typeof BUILTIN_BOARDS === 'undefined' ? null : BUILTIN_BOARDS[index];
+    const label = config && config.name ? config.name : String(index + 1);
+    button.textContent = label;
+    if (config && config.name) {
+      button.title = config.name;
+    } else {
+      button.removeAttribute('title');
+    }
+    if (index === selectedPresetIndex) {
+      button.classList.add('selected');
+      button.setAttribute('aria-pressed', 'true');
+    } else {
+      button.classList.remove('selected');
+      button.setAttribute('aria-pressed', 'false');
+    }
+  });
+}
+
+function setSelectedPresetIndex(index) {
+  selectedPresetIndex = index;
+  updatePresetButtons();
+}
+
 function showMenu() {
   cancelAiMove();
   const menuScreen = document.getElementById('menuScreen');
@@ -125,6 +161,11 @@ function updateCustomSizeVisibility() {
 }
 
 function startGame() {
+  const presetConfig = getSelectedPresetConfig();
+  if (presetConfig) {
+    startGameWithConfig(presetConfig);
+    return;
+  }
   cancelAiMove();
   activeCustomBoard = null;
   const boardMode = getSelectedValue('boardMode', 'normal');
@@ -250,17 +291,22 @@ if (loadCancelBtn) loadCancelBtn.addEventListener('click', closeLoadDialog);
 
 document.querySelectorAll('[data-board-index]').forEach((button) => {
   button.addEventListener('click', () => {
-    if (typeof BUILTIN_BOARDS === 'undefined') return;
     const index = parseInt(button.dataset.boardIndex, 10);
     if (Number.isNaN(index)) return;
-    const config = BUILTIN_BOARDS[index];
-    if (!config) return;
-    startGameWithConfig(config);
+    if (selectedPresetIndex === index) {
+      setSelectedPresetIndex(null);
+      return;
+    }
+    setSelectedPresetIndex(index);
   });
 });
+updatePresetButtons();
 
 document.querySelectorAll('input[name="boardMode"]').forEach((radio) => {
-  radio.addEventListener('change', updateCustomSizeVisibility);
+  radio.addEventListener('change', () => {
+    updateCustomSizeVisibility();
+    setSelectedPresetIndex(null);
+  });
 });
 updateCustomSizeVisibility();
 
