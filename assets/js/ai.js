@@ -2,18 +2,22 @@ const AI_DEPTHS = {
   easy: 1,
   medium: 2,
   hard: 3,
-  extreme: 4
+  extreme: 4,
+  ultimate: 5
 };
 
 const AI_TIME_LIMITS = {
   easy: 120,
   medium: 200,
   hard: 280,
-  extreme: 360
+  extreme: 360,
+  ultimate: 450
 };
 
 const AI_WIN_SCORE = 1000000;
 const AI_FORFEIT_SCORE = 900000;
+const AI_THINK_DELAY_MIN = 200;
+const AI_THINK_DELAY_MAX = 500;
 
 const PIECE_VALUES = {
   g: 10000,
@@ -78,7 +82,8 @@ function maybeTriggerAiMove() {
   updateStatus();
   updateUndoButton();
   const token = ++aiToken;
-  aiTimeoutId = setTimeout(() => runAiMove(token), 30);
+  const delay = AI_THINK_DELAY_MIN + Math.floor(Math.random() * (AI_THINK_DELAY_MAX - AI_THINK_DELAY_MIN + 1));
+  aiTimeoutId = setTimeout(() => runAiMove(token), delay);
 }
 
 function runAiMove(token) {
