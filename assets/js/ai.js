@@ -7,11 +7,11 @@ const AI_DEPTHS = {
 };
 
 const AI_TIME_LIMITS = {
-  easy: 120,
-  medium: 200,
-  hard: 280,
-  extreme: 360,
-  ultimate: 450
+  easy: 5000,
+  medium: 10000,
+  hard: 30000,
+  extreme: 60000,
+  ultimate: 0
 };
 
 const AI_WIN_SCORE = 1000000;
