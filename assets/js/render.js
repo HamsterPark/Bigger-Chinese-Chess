@@ -79,6 +79,7 @@ function renderRiverOverlay(boardDiv, meta) {
 
 function onCellClick(x, y) {
   if (gameOver) return;
+  if (aiThinking || (isAiEnabled() && currentPlayer === 'black')) return;
   const clickedPiece = board[y][x];
   if (selected) {
     if (possibleMoves.some(m => m.x === x && m.y === y)) {
@@ -88,15 +89,20 @@ function onCellClick(x, y) {
       possibleMoves = [];
       const winner = checkWinner();
       if (winner) {
-        gameOver = true;
-        updateStatus(winner);
-        showResultDialog(winner);
-        renderBoard();
+        endGame(winner);
         return;
       }
-      currentPlayer = currentPlayer === 'red' ? 'black' : 'red';
+      const nextPlayer = currentPlayer === 'red' ? 'black' : 'red';
+      currentPlayer = nextPlayer;
+      if (!hasAnyLegalMove(currentPlayer)) {
+        handleForfeit(currentPlayer);
+        return;
+      }
       updateStatus();
+      recordMoveHistory();
+      updateUndoButton();
       renderBoard();
+      maybeTriggerAiMove();
       return;
     }
     if (clickedPiece && clickedPiece.color === currentPlayer && clickedPiece.type !== 'b') {

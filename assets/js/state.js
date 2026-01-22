@@ -24,6 +24,9 @@ let aiLevel = 'none';
 let gameOver = false;
 let boardMeta = null;
 let activeCustomBoard = null;
+let aiThinking = false;
+let aiTimeoutId = null;
+let aiToken = 0;
 
 let editorBoard = [];
 let editorMeta = null;
@@ -34,4 +37,5 @@ let editorPalaceBlack = { left: 3, top: 0, width: 3, height: 3 };
 let editorPalaceRed = { left: 3, top: 7, width: 3, height: 3 };
 let editorInitialized = false;
 let editorDragPayload = null;
+let moveHistory = [];
 

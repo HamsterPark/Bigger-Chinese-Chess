@@ -37,6 +37,7 @@
   possibleMoves = [];
   gameOver = false;
   updateStatus();
+  resetMoveHistory();
 }
 
 function initBoardFromConfig(config) {
@@ -65,6 +66,7 @@ function initBoardFromConfig(config) {
   possibleMoves = [];
   gameOver = false;
   updateStatus();
+  resetMoveHistory();
 }
 
 function placeAdvisors() {
@@ -109,6 +111,75 @@ function placePawns() {
     placePiece(col, redRow, 'p', 'red');
   });
 }
+
+function cloneBoardSnapshot(sourceBoard) {
+  return sourceBoard.map(row => row.map(cell => cell ? { ...cell } : null));
+}
+
+function buildHistorySnapshot() {
+  return {
+    board: cloneBoardSnapshot(board),
+    currentPlayer,
+    gameOver
+  };
+}
+
+function resetMoveHistory() {
+  moveHistory = [buildHistorySnapshot()];
+}
+
+function recordMoveHistory() {
+  moveHistory.push(buildHistorySnapshot());
+}
+
+function canUndoTurn() {
+  return moveHistory.length >= 3;
+}
+
+function undoLastTurn() {
+  if (!canUndoTurn()) return false;
+  moveHistory.splice(-2, 2);
+  const snapshot = moveHistory[moveHistory.length - 1];
+  board = cloneBoardSnapshot(snapshot.board);
+  currentPlayer = snapshot.currentPlayer;
+  gameOver = snapshot.gameOver;
+  selected = null;
+  possibleMoves = [];
+  return true;
+}
+
+function getAllMovesForColor(color) {
+  const moves = [];
+  for (let y = 0; y < boardHeight; y++) {
+    for (let x = 0; x < boardWidth; x++) {
+      const piece = board[y][x];
+      if (!piece || piece.type === 'b' || piece.color !== color) continue;
+      const targets = calcMoves(x, y, piece);
+      targets.forEach(target => {
+        moves.push({
+          fromX: x,
+          fromY: y,
+          toX: target.x,
+          toY: target.y
+        });
+      });
+    }
+  }
+  return moves;
+}
+
+function hasAnyLegalMove(color) {
+  for (let y = 0; y < boardHeight; y++) {
+    for (let x = 0; x < boardWidth; x++) {
+      const piece = board[y][x];
+      if (!piece || piece.type === 'b' || piece.color !== color) continue;
+      const moves = calcMoves(x, y, piece);
+      if (moves.length) return true;
+    }
+  }
+  return false;
+}
+
 function calcMoves(x, y, piece) {
   const moves = [];
   const type = piece.type;

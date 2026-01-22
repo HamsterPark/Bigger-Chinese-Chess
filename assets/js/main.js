@@ -1,14 +1,25 @@
 ﻿function updateStatus(winner) {
   const statusEl = document.getElementById('status');
   if (!statusEl) return;
+  const reason = arguments.length > 1 ? arguments[1] : null;
   if (winner) {
+    if (reason === 'forfeit') {
+      const loser = winner === 'red' ? 'black' : 'red';
+      statusEl.textContent = `${loser === 'red' ? '红方' : '黑方'}判负`;
+      return;
+    }
     statusEl.textContent = `${winner === 'red' ? '红方' : '黑方'}胜`;
+    return;
+  }
+  if (aiThinking && isAiEnabled()) {
+    statusEl.textContent = 'AI思考中';
     return;
   }
   statusEl.textContent = `当前：${currentPlayer === 'red' ? '红方' : '黑方'}`;
 }
 
 function showMenu() {
+  cancelAiMove();
   const menuScreen = document.getElementById('menuScreen');
   const gameScreen = document.getElementById('gameScreen');
   const editorScreen = document.getElementById('editorScreen');
@@ -36,17 +47,43 @@ function showEditor() {
   if (editorScreen) editorScreen.classList.remove('hidden');
 }
 
-function showResultDialog(winner) {
+function showResultDialog(winner, reason) {
   const overlay = document.getElementById('resultOverlay');
   const text = document.getElementById('resultText');
   if (!overlay || !text) return;
-  text.textContent = `${winner === 'red' ? '红方' : '黑方'}胜`;
+  if (reason === 'forfeit') {
+    const loser = winner === 'red' ? 'black' : 'red';
+    text.textContent = `${loser === 'red' ? '红方' : '黑方'}判负`;
+  } else {
+    text.textContent = `${winner === 'red' ? '红方' : '黑方'}胜`;
+  }
   overlay.classList.remove('hidden');
 }
 
 function closeResultDialog() {
   const overlay = document.getElementById('resultOverlay');
   if (overlay) overlay.classList.add('hidden');
+}
+
+function endGame(winner, reason) {
+  cancelAiMove(true);
+  gameOver = true;
+  updateStatus(winner, reason);
+  showResultDialog(winner, reason);
+  recordMoveHistory();
+  updateUndoButton();
+  renderBoard();
+}
+
+function handleForfeit(loser) {
+  const winner = loser === 'red' ? 'black' : 'red';
+  endGame(winner, 'forfeit');
+}
+
+function updateUndoButton() {
+  const undoBtn = document.getElementById('undoBtn');
+  if (!undoBtn) return;
+  undoBtn.disabled = aiThinking || !canUndoTurn();
 }
 
 function getSelectedValue(name, fallback) {
@@ -78,6 +115,7 @@ function updateCustomSizeVisibility() {
 }
 
 function startGame() {
+  cancelAiMove();
   activeCustomBoard = null;
   const boardMode = getSelectedValue('boardMode', 'normal');
   const expandMode = getSelectedValue('expandMode', 'standard');
@@ -97,15 +135,19 @@ function startGame() {
   pieceMode = normalizePieceMode(expandMode);
   initBoard();
   renderBoard();
+  updateUndoButton();
   closeResultDialog();
   showGame();
 }
 
 function startGameWithConfig(config) {
+  cancelAiMove();
   activeCustomBoard = config;
+  aiLevel = getSelectedValue('aiLevel', 'none');
   pieceMode = 'standard';
   initBoard();
   renderBoard();
+  updateUndoButton();
   closeResultDialog();
   showGame();
 }
@@ -121,9 +163,21 @@ if (backBtn) backBtn.addEventListener('click', () => {
 
 const resetBtn = document.getElementById('resetBtn');
 if (resetBtn) resetBtn.addEventListener('click', () => {
+  cancelAiMove();
   initBoard();
   renderBoard();
+  updateUndoButton();
   closeResultDialog();
+});
+
+const undoBtn = document.getElementById('undoBtn');
+if (undoBtn) undoBtn.addEventListener('click', () => {
+  cancelAiMove();
+  if (!undoLastTurn()) return;
+  closeResultDialog();
+  updateStatus(gameOver ? checkWinner() : null);
+  renderBoard();
+  updateUndoButton();
 });
 
 const resultCloseBtn = document.getElementById('resultCloseBtn');
