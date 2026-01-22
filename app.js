@@ -710,10 +710,16 @@ function renderBoard() {
       if (y === 0) cellDiv.classList.add('top-edge');
       if (x === boardWidth - 1) cellDiv.classList.add('right-edge');
       if (y === boardHeight - 1) cellDiv.classList.add('bottom-edge');
-      const palaceSide = palaceAt(boardMeta, x, y);
-      if (palaceSide === 'red') {
+      const isRedPalace = isInPalaceForMeta(boardMeta, 'red', x, y);
+      const isBlackPalace = isInPalaceForMeta(boardMeta, 'black', x, y);
+      if (isRedPalace || isBlackPalace) {
+        cellDiv.classList.add('palace-cell');
+      }
+      if (isRedPalace && isBlackPalace) {
+        cellDiv.classList.add('palace-overlap');
+      } else if (isRedPalace) {
         cellDiv.classList.add('palace-red');
-      } else if (palaceSide === 'black') {
+      } else if (isBlackPalace) {
         cellDiv.classList.add('palace-black');
       }
       if (possibleMoves.some(m => m.x === x && m.y === y)) {
@@ -1018,10 +1024,16 @@ function renderEditorBoard() {
       if (y === 0) cellDiv.classList.add('top-edge');
       if (x === editorWidth - 1) cellDiv.classList.add('right-edge');
       if (y === editorHeight - 1) cellDiv.classList.add('bottom-edge');
-      const palaceSide = palaceAt(editorMeta, x, y);
-      if (palaceSide === 'red') {
+      const isRedPalace = isInPalaceForMeta(editorMeta, 'red', x, y);
+      const isBlackPalace = isInPalaceForMeta(editorMeta, 'black', x, y);
+      if (isRedPalace || isBlackPalace) {
+        cellDiv.classList.add('palace-cell');
+      }
+      if (isRedPalace && isBlackPalace) {
+        cellDiv.classList.add('palace-overlap');
+      } else if (isRedPalace) {
         cellDiv.classList.add('palace-red');
-      } else if (palaceSide === 'black') {
+      } else if (isBlackPalace) {
         cellDiv.classList.add('palace-black');
       }
       const piece = editorBoard[y][x];

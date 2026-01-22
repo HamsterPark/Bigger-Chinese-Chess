@@ -184,6 +184,12 @@ h1 {
 .cell.palace-black {
   background-color: rgba(120, 120, 120, 0.2);
 }
+.cell.palace-overlap {
+  background-color: rgba(255, 200, 120, 0.35);
+}
+.cell.palace-cell {
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.4);
+}
 /* 高亮可走位置 */
 .cell.highlight {
   background-color: rgba(0, 255, 0, 0.3);
