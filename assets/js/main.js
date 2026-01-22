@@ -248,6 +248,17 @@ if (loadStartBtn) loadStartBtn.addEventListener('click', () => {
 const loadCancelBtn = document.getElementById('loadCancelBtn');
 if (loadCancelBtn) loadCancelBtn.addEventListener('click', closeLoadDialog);
 
+document.querySelectorAll('[data-board-index]').forEach((button) => {
+  button.addEventListener('click', () => {
+    if (typeof BUILTIN_BOARDS === 'undefined') return;
+    const index = parseInt(button.dataset.boardIndex, 10);
+    if (Number.isNaN(index)) return;
+    const config = BUILTIN_BOARDS[index];
+    if (!config) return;
+    startGameWithConfig(config);
+  });
+});
+
 document.querySelectorAll('input[name="boardMode"]').forEach((radio) => {
   radio.addEventListener('change', updateCustomSizeVisibility);
 });
