@@ -1,0 +1,235 @@
+/* 基础样式 */
+body {
+  font-family: sans-serif;
+  background: #f7f7f7;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+h1 {
+  margin-top: 20px;
+}
+.screen {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.screen.hidden {
+  display: none;
+}
+.hidden {
+  display: none;
+}
+.menu-group {
+  width: min(920px, 96%);
+  margin: 8px 0;
+  text-align: center;
+}
+.menu-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+.menu-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.menu-options.hidden {
+  display: none;
+}
+.custom-size {
+  margin-top: 6px;
+  gap: 12px;
+}
+.custom-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px dashed #888;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+}
+.custom-input input {
+  width: 80px;
+  font-size: 14px;
+  padding: 2px 4px;
+}
+.option {
+  cursor: pointer;
+  user-select: none;
+}
+.option input {
+  display: none;
+}
+.option span {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px solid #666;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 14px;
+}
+.option input:checked + span {
+  background: #222;
+  color: #fff;
+  border-color: #222;
+}
+.option-button {
+  padding: 6px 12px;
+  border: 1px solid #666;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.option-button:active {
+  transform: translateY(1px);
+}
+.controls {
+  margin: 10px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.menu-actions {
+  margin: 12px 0 20px;
+  display: flex;
+  justify-content: center;
+}
+.game-header {
+  margin: 12px 0 4px;
+}
+.controls button,
+.menu-actions button {
+  margin-right: 0;
+  padding: 6px 12px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.controls label {
+  font-size: 14px;
+}
+.controls input,
+.controls select {
+  font-size: 14px;
+  padding: 4px 6px;
+  margin-left: 4px;
+}
+.status {
+  margin: 8px 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* 棋盘样式 */
+#board {
+  display: grid;
+  position: relative;
+  border: 2px solid #333;
+  background: #ffe5b4;
+}
+.cell {
+  width: 60px;
+  height: 60px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+/* 绘制网格线 */
+.cell::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-top: 1px solid #333;
+  border-right: 1px solid #333;
+}
+/* 左边界添加左边线 */
+.cell.left-edge::before {
+  border-left: 1px solid #333;
+}
+/* 上边界添加上边线 */
+.cell.top-edge::before {
+  border-top: 1px solid #333;
+}
+/* 下边界添加下边线 */
+.cell.bottom-edge::before {
+  border-bottom: 1px solid #333;
+}
+/* 右边界添加右边线 */
+.cell.right-edge::before {
+  border-right: 1px solid #333;
+}
+/* 宫区提示 */
+.cell.palace {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+/* 高亮可走位置 */
+.cell.highlight {
+  background-color: rgba(0, 255, 0, 0.3);
+}
+/* 选中棋子 */
+.selected-piece {
+  outline: 2px solid #f00;
+  border-radius: 50%;
+}
+.river-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  pointer-events: none;
+  border-top: 4px solid rgba(0, 0, 0, 0.45);
+}
+.piece {
+  font-size: 32px;
+  user-select: none;
+}
+.piece.red {
+  color: #d30000;
+}
+.piece.black {
+  color: #000;
+}
+.dialog {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 10;
+}
+.dialog.hidden {
+  display: none;
+}
+.dialog-content {
+  background: #fff;
+  padding: 20px 24px;
+  border-radius: 6px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  min-width: 180px;
+}
+.dialog-content button {
+  margin-top: 12px;
+  padding: 6px 12px;
+  font-size: 16px;
+  cursor: pointer;
+}

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <title>象棋扩展版小游戏</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="menuScreen" class="screen">
+    <h1>象棋扩展版小游戏</h1>
+    <p>开始菜单：选择棋盘与扩展模式</p>
+    <div class="menu-group">
+      <div class="menu-title">常用棋盘模式</div>
+      <div class="menu-options">
+        <label class="option">
+          <input type="radio" name="boardMode" value="normal" checked />
+          <span>标准</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="boardMode" value="wide" />
+          <span>横向加倍</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="boardMode" value="tall" />
+          <span>纵向加倍</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="boardMode" value="big" />
+          <span>横纵加倍</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="boardMode" value="custom" />
+          <span>自定义</span>
+        </label>
+      </div>
+      <div id="customBoardSize" class="menu-options custom-size hidden">
+        <label class="custom-input">列数
+          <input id="customBoardWidth" type="number" min="9" value="9" />
+        </label>
+        <label class="custom-input">行数
+          <input id="customBoardHeight" type="number" min="10" value="10" />
+        </label>
+      </div>
+    </div>
+    <div class="menu-group">
+      <div class="menu-title">扩展模式</div>
+      <div class="menu-options">
+        <label class="option">
+          <input type="radio" name="expandMode" value="standard" checked />
+          <span>标准</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="expandMode" value="pawns" />
+          <span>扩展兵</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="expandMode" value="generals" />
+          <span>扩展将</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="expandMode" value="both" />
+          <span>扩展兵将</span>
+        </label>
+      </div>
+    </div>
+    <div class="menu-group">
+      <div class="menu-title">自定义棋盘编辑器</div>
+      <div class="menu-options">
+        <button class="option-button" type="button">编辑棋盘</button>
+        <button class="option-button" type="button">加载棋盘</button>
+      </div>
+    </div>
+    <div class="menu-group">
+      <div class="menu-title">AI对手</div>
+      <div class="menu-options">
+        <label class="option">
+          <input type="radio" name="aiLevel" value="none" checked />
+          <span>无对手（玩家控制双方）</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="aiLevel" value="easy" />
+          <span>简单</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="aiLevel" value="medium" />
+          <span>中等</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="aiLevel" value="hard" />
+          <span>困难</span>
+        </label>
+        <label class="option">
+          <input type="radio" name="aiLevel" value="extreme" />
+          <span>极限</span>
+        </label>
+      </div>
+    </div>
+    <div class="menu-actions">
+      <button id="startBtn">开始对局</button>
+    </div>
+  </div>
+
+  <div id="gameScreen" class="screen hidden">
+    <div class="controls game-header">
+      <button id="backBtn">返回菜单</button>
+      <button id="resetBtn">重新开始</button>
+    </div>
+    <div id="status" class="status"></div>
+    <div id="board"></div>
+  </div>
+
+  <div id="resultOverlay" class="dialog hidden" role="dialog" aria-modal="true">
+    <div class="dialog-content">
+      <div id="resultText"></div>
+      <button id="resultCloseBtn">确定</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
