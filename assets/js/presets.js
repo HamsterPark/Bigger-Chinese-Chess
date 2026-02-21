@@ -1,4 +1,6 @@
-﻿const BUILTIN_BOARDS = [
+'use strict';
+
+const BUILTIN_BOARDS = [
     {
         "name":  "5*6",
         "width":  5,

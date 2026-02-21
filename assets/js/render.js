@@ -1,4 +1,6 @@
-﻿function getPieceChar(piece) {
+'use strict';
+
+function getPieceChar(piece) {
   if (!piece) return '';
   const { type, color } = piece;
   if (type === 'b') return '';

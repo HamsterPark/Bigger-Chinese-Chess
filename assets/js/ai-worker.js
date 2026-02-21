@@ -1,3 +1,5 @@
+'use strict';
+
 const AI_WIN_SCORE = 1000000;
 const AI_FORFEIT_SCORE = 900000;
 

@@ -1,4 +1,6 @@
-﻿function initBoard() {
+'use strict';
+
+function initBoard() {
   if (activeCustomBoard) {
     initBoardFromConfig(activeCustomBoard);
     return;
