@@ -1,3 +1,5 @@
+'use strict';
+
 const AI_DEPTHS = {
   easy: 2,
   medium: 3,

@@ -1,7 +1,8 @@
-﻿function updateStatus(winner) {
+'use strict';
+
+function updateStatus(winner = null, reason = null) {
   const statusEl = document.getElementById('status');
   if (!statusEl) return;
-  const reason = arguments.length > 1 ? arguments[1] : null;
   if (winner) {
     if (reason === 'forfeit') {
       const loser = winner === 'red' ? 'black' : 'red';
